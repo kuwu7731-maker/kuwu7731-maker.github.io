@@ -1,11 +1,6 @@
-'use client'
-
-import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { GraduationCap, MessageCircle, Clock, ArrowRight, Menu, X, TrendingUp } from 'lucide-react'
+import { GraduationCap, MessageCircle, Clock, ArrowRight, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
-import { signOut } from '@/lib/auth/auth'
-import { useParams } from 'next/navigation'
+import GradePageClient from './GradePageClient'
 
 const gradeInfo: Record<number, { name: string; description: string; color: string }> = {
   7: { name: '七年级 · 启航', description: '新生适应、学习方法、社团招新', color: 'cyan' },
@@ -21,15 +16,14 @@ const mockPosts = [
   { id: 5, title: '周末作业讨论群', author: '班长', time: '昨天', views: 145, replies: 45, isTop: false },
 ]
 
-export default function GradePage() {
-  const params = useParams()
-  const gradeId = parseInt(params.id as string)
-  const grade = gradeInfo[gradeId] || gradeInfo[7]
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+type GradePageProps = {
+  params: Promise<{ id: string }>
+}
 
-  const handleSignOut = async () => {
-    await signOut({ redirect: true, callbackUrl: '/' })
-  }
+export default async function GradePage({ params }: GradePageProps) {
+  const { id } = await params
+  const gradeId = parseInt(id)
+  const grade = gradeInfo[gradeId] || gradeInfo[7]
 
   return (
     <div className="min-h-screen">
@@ -50,31 +44,12 @@ export default function GradePage() {
               <Link href="/grade/8" className={`text-sm ${gradeId === 8 ? 'text-gemini-cyan' : 'text-white/60 hover:text-gemini-cyan'}`}>八年级</Link>
               <Link href="/grade/9" className={`text-sm ${gradeId === 9 ? 'text-gemini-cyan' : 'text-white/60 hover:text-gemini-cyan'}`}>九年级</Link>
               <Link href="/post/create" className="gradient-button text-sm px-4 py-2">发帖</Link>
-              <button onClick={handleSignOut} className="glass-button text-sm px-4 py-2">退出</button>
+              <GradePageClient />
             </div>
 
-            <button
-              className="md:hidden p-2 text-white/60"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+            <GradePageClient mobile />
           </div>
         </div>
-
-        <motion.div
-          initial={false}
-          animate={{ height: mobileMenuOpen ? 'auto' : 0, opacity: mobileMenuOpen ? 1 : 0 }}
-          className="md:hidden overflow-hidden"
-        >
-          <div className="px-4 pb-4 space-y-2">
-            <Link href="/grade/7" className="block py-2 text-white/60 hover:text-gemini-cyan">七年级</Link>
-            <Link href="/grade/8" className="block py-2 text-white/60 hover:text-gemini-cyan">八年级</Link>
-            <Link href="/grade/9" className="block py-2 text-white/60 hover:text-gemini-cyan">九年级</Link>
-            <Link href="/post/create" className="block py-2 text-center gradient-button text-sm">发帖</Link>
-            <button onClick={handleSignOut} className="w-full py-2 glass-button text-sm">退出</button>
-          </div>
-        </motion.div>
       </nav>
 
       <div className="pt-16">
@@ -82,13 +57,8 @@ export default function GradePage() {
           <div className={`absolute inset-0 bg-gemini-${grade.color}/5`} />
           
           <div className="relative max-w-7xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <h1 className="text-3xl font-bold text-white mb-2">{grade.name}</h1>
-              <p className="text-white/60">{grade.description}</p>
-            </motion.div>
+            <h1 className="text-3xl font-bold text-white mb-2">{grade.name}</h1>
+            <p className="text-white/60">{grade.description}</p>
           </div>
         </section>
 
@@ -106,12 +76,9 @@ export default function GradePage() {
             </div>
 
             <div className="space-y-4">
-              {mockPosts.map((post, index) => (
-                <motion.div
+              {mockPosts.map((post) => (
+                <div
                   key={post.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
                   className={`glass-card glass-card-hover p-4 flex items-center gap-4 ${post.isTop ? 'border-l-4 border-gemini-cyan' : ''}`}
                 >
                   {post.isTop && (
@@ -139,7 +106,7 @@ export default function GradePage() {
                     <span>{post.views} 阅读</span>
                     <ArrowRight className="w-4 h-4 text-gemini-cyan" />
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
 

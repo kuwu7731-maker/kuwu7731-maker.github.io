@@ -17,7 +17,8 @@
     "opennext:build": "npx opennextjs-cloudflare build"
   },
   "dependencies": {
-    "@next-auth/prisma-adapter": "^1.0.7",
+    "@auth/core": "^0.34.3",
+    "@auth/prisma-adapter": "^2.11.2",
     "@prisma/client": "^5.14.0",
     "@radix-ui/react-slot": "^1.0.2",
     "bcryptjs": "^2.4.3",
@@ -26,7 +27,7 @@
     "framer-motion": "^11.2.6",
     "lucide-react": "^0.378.0",
     "next": "15.5.2",
-    "next-auth": "^4.24.7",
+    "next-auth": "5.0.0-beta.31",
     "prisma": "^5.14.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
