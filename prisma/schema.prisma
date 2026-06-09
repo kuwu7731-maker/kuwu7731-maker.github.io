@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./shool_forum.db"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String
+  role          String    @default("student")
+  identity      String
+  grade         Int?
+  status        String    @default("active")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  posts         Post[]
+  comments      Comment[]
+  sensitiveLogs SensitiveWordLog[]
+}
+
+model Post {
+  id          String    @id @default(uuid())
+  userId      String
+  gradeId     Int
+  title       String
+  content     String
+  status      String    @default("pending")
+  isTop       Boolean   @default(false)
+  isEssential Boolean   @default(false)
+  viewCount   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grade       Grade     @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  content   String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Grade {
+  id          Int    @id
+  name        String
+  description String
+  createdAt   DateTime @default(now())
+  posts       Post[]
+}
+
+model SensitiveWord {
+  id             String            @id @default(uuid())
+  word           String
+  type           String            @default("banned")
+  isRegex        Boolean           @default(false)
+  pinyinVariants String            @default("[]")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  logs           SensitiveWordLog[]
+}
+
+model SensitiveWordLog {
+  id        String   @id @default(uuid())
+  wordId    String
+  content   String
+  userId    String?
+  action    String
+  createdAt DateTime @default(now())
+  word      SensitiveWord @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
