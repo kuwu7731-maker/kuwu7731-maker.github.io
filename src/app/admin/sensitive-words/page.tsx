@@ -3,14 +3,15 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Upload, Trash2, Search, X, Save, AlertCircle, CheckCircle, BarChart3, RefreshCw } from 'lucide-react'
-import { freeContentFilter } from '@/lib/sensitive-word/free-content-filter'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
 
 interface WordStat {
   word: string
   count: number
+}
+
+interface Notification {
+  type: 'success' | 'error'
+  message: string
 }
 
 export default function SensitiveWordsPage() {
@@ -18,7 +19,7 @@ export default function SensitiveWordsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isAdding, setIsAdding] = useState(false)
   const [newWord, setNewWord] = useState('')
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [notification, setNotification] = useState<Notification | null>(null)
   const [stats, setStats] = useState<WordStat[]>([])
   const [wordCount, setWordCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -32,49 +33,29 @@ export default function SensitiveWordsPage() {
   const loadWords = async () => {
     setIsLoading(true)
     try {
-      const count = await freeContentFilter.getWordCount()
-      setWordCount(count)
-      
-      const wordsPath = require('path').join(process.cwd(), 'data', 'clean-base-words.txt')
-      const fs = require('fs')
-      if (fs.existsSync(wordsPath)) {
-        const content = fs.readFileSync(wordsPath, 'utf-8')
-        const wordList = content.split('\n').map((w: string) => w.trim()).filter((w: string) => w.length >= 2)
-        setWords(wordList)
-      }
+      const response = await fetch('/api/sensitive-words/file-list')
+      const data = await response.json()
+      setWords(data.words || [])
+      setWordCount(data.count || 0)
     } catch {
       setWords([])
+      setWordCount(0)
     }
     setIsLoading(false)
   }
 
   const loadStats = async () => {
     try {
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-      const logs = await prisma.sensitiveWordLog.findMany({
-        where: {
-          createdAt: { gte: sevenDaysAgo },
-        },
-      })
-
-      const wordCounts: Record<string, number> = {}
-      for (const log of logs) {
-        const matchedWords = log.content.split('|').filter((w: string) => w.trim())
-        for (const word of matchedWords) {
-          wordCounts[word] = (wordCounts[word] || 0) + 1
-        }
+      const response = await fetch('/api/sensitive-words')
+      const data = await response.json()
+      if (Array.isArray(data)) {
+        const sortedStats = data
+          .map((item: { word: string; count: number }) => ({ word: item.word, count: item.count || 0 }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 20)
+        setStats(sortedStats)
       }
-
-      const sortedStats = Object.entries(wordCounts)
-        .map(([word, count]) => ({ word, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 20)
-
-      setStats(sortedStats)
-    } catch (error) {
-      console.error('加载统计数据失败:', error)
+    } catch {
       setStats([])
     }
   }
@@ -90,12 +71,21 @@ export default function SensitiveWordsPage() {
     }
 
     try {
-      await freeContentFilter.addWords([newWord])
-      setNewWord('')
-      setIsAdding(false)
-      await loadWords()
-      setNotification({ type: 'success', message: '敏感词添加成功' })
-    } catch (error) {
+      const response = await fetch('/api/sensitive-words', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word: newWord, type: 'banned', isRegex: false }),
+      })
+      
+      if (response.ok) {
+        setNewWord('')
+        setIsAdding(false)
+        await loadWords()
+        setNotification({ type: 'success', message: '敏感词添加成功' })
+      } else {
+        setNotification({ type: 'error', message: '添加失败' })
+      }
+    } catch {
       setNotification({ type: 'error', message: '添加失败' })
     }
   }
@@ -104,10 +94,17 @@ export default function SensitiveWordsPage() {
     if (!confirm('确定删除这个敏感词吗？')) return
 
     try {
-      await freeContentFilter.removeWord(word)
-      await loadWords()
-      setNotification({ type: 'success', message: '敏感词删除成功' })
-    } catch (error) {
+      const response = await fetch(`/api/sensitive-words/${word}`, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        await loadWords()
+        setNotification({ type: 'success', message: '敏感词删除成功' })
+      } else {
+        setNotification({ type: 'error', message: '删除失败' })
+      }
+    } catch {
       setNotification({ type: 'error', message: '删除失败' })
     }
   }
@@ -125,10 +122,17 @@ export default function SensitiveWordsPage() {
       const content = await file.text()
       const newWords = content.split('\n').map((w: string) => w.trim()).filter((w: string) => w.length >= 2)
       
-      await freeContentFilter.addWords(newWords)
+      for (const word of newWords) {
+        await fetch('/api/sensitive-words', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word, type: 'banned', isRegex: false }),
+        })
+      }
+      
       await loadWords()
       setNotification({ type: 'success', message: `成功添加 ${newWords.length} 个敏感词` })
-    } catch (error) {
+    } catch {
       setNotification({ type: 'error', message: '上传失败' })
     }
   }
