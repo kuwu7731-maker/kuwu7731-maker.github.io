@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { GraduationCap, MessageCircle, Clock, ArrowRight, Menu, X, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { signOut } from '@/lib/auth/auth'
+import { useParams } from 'next/navigation'
 
 const gradeInfo: Record<number, { name: string; description: string; color: string }> = {
   7: { name: '七年级 · 启航', description: '新生适应、学习方法、社团招新', color: 'cyan' },
@@ -20,8 +21,9 @@ const mockPosts = [
   { id: 5, title: '周末作业讨论群', author: '班长', time: '昨天', views: 145, replies: 45, isTop: false },
 ]
 
-export default function GradePage({ params }: { params: { id: string } }) {
-  const gradeId = parseInt(params.id)
+export default function GradePage() {
+  const params = useParams()
+  const gradeId = parseInt(params.id as string)
   const grade = gradeInfo[gradeId] || gradeInfo[7]
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
