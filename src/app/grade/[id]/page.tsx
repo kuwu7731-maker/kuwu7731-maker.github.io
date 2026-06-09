@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { GraduationCap, MessageCircle, Clock, ArrowRight, Menu, X, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
-import { auth, signOut } from '@/lib/auth/auth'
+import { signOut } from '@/lib/auth/auth'
 
 const gradeInfo: Record<number, { name: string; description: string; color: string }> = {
   7: { name: '七年级 · 启航', description: '新生适应、学习方法、社团招新', color: 'cyan' },

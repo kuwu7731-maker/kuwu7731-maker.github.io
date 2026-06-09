@@ -99,7 +99,7 @@ export const authOptions: AuthOptions = {
   },
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
+export { signIn, signOut } from 'next-auth/react'
 
 export async function registerUser(data: {
   email: string

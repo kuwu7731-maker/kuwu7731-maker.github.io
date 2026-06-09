@@ -220,8 +220,8 @@ export function SlideCaptcha({ onVerify, challengeId, targetOffset, disabled = f
             <motion.div
               key="arrow"
               initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              animate={{
+              animate={{ 
+                scale: 1,
                 x: isDragging ? [0, 6, 0] : 0,
               }}
               transition={{

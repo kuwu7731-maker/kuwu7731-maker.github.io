@@ -173,7 +173,7 @@ class SensitiveWordService {
         word,
         type,
         isRegex,
-        pinyinVariants,
+        pinyinVariants: JSON.stringify(pinyinVariants),
       },
     })
 
@@ -195,7 +195,7 @@ class SensitiveWordService {
       where: { id },
       data: {
         ...updates,
-        pinyinVariants,
+        pinyinVariants: JSON.stringify(pinyinVariants),
       },
     })
 

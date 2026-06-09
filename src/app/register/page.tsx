@@ -400,8 +400,8 @@ export default function RegisterPage() {
                         ? 'bg-white/5 text-white/30 cursor-not-allowed border border-white/10'
                         : 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-[length:200%_200%] animate-gradient-shift text-white shadow-[0_0_20px_rgba(0,229,255,0.4),0_0_40px_rgba(41,121,255,0.2)] hover:shadow-[0_0_30px_rgba(0,229,255,0.6),0_0_60px_rgba(213,0,249,0.3)] hover:scale-[1.02]'
                     }`}
-                    whileHover={!isSubmitting && { scale: 1.02 }}
-                    whileTap={!isSubmitting && { scale: 0.98 }}
+                    whileHover={isSubmitting ? undefined : { scale: 1.02 }}
+                    whileTap={isSubmitting ? undefined : { scale: 0.98 }}
                   >
                     {isSubmitting ? (
                       <div className="flex items-center gap-2">

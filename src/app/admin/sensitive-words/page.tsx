@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Upload, Trash2, Search, X, Save, AlertCircle, CheckCircle, BarChart3, RefreshCw, Filter } from 'lucide-react'
+import { Plus, Upload, Trash2, Search, X, Save, AlertCircle, CheckCircle, BarChart3, RefreshCw } from 'lucide-react'
 import { freeContentFilter } from '@/lib/sensitive-word/free-content-filter'
 import { PrismaClient } from '@prisma/client'
 
@@ -158,24 +158,24 @@ export default function SensitiveWordsPage() {
         />
       </div>
 
-      <div className="fixed top-0 left-0 right-0 h-16 glass-card border-b-0 flex items-center justify-between px-6 z-50">
+      <div className="fixed top-0 left-0 right-0 h-16 bg-white/5 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-6 z-50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 flex items-center justify-center">
             <BarChart3 className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-gradient">敏感词管理</h1>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">敏感词管理</h1>
         </div>
         <div className="flex gap-3">
           <motion.button
             onClick={() => setIsAdding(true)}
-            className="gradient-button flex items-center gap-2 text-sm"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 text-white font-medium text-sm flex items-center gap-2"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
             <Plus className="w-4 h-4" />
             添加敏感词
           </motion.button>
-          <label className="glass-button flex items-center gap-2 text-sm cursor-pointer">
+          <label className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white font-medium text-sm flex items-center gap-2 cursor-pointer hover:bg-white/10 transition-all">
             <Upload className="w-4 h-4" />
             上传词库
             <input
@@ -190,7 +190,7 @@ export default function SensitiveWordsPage() {
 
       <div className="pt-20 px-6 pb-6 relative z-10">
         <div className="max-w-6xl mx-auto">
-          <div className="glass-card p-4 mb-6">
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 mb-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
@@ -199,7 +199,7 @@ export default function SensitiveWordsPage() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="搜索敏感词..."
-                  className="w-full input-glass pl-12"
+                  className="w-full px-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/40 focus:outline-none focus:border-cyan-400/50 transition-all"
                 />
               </div>
               <div className="flex items-center gap-4">
@@ -223,8 +223,8 @@ export default function SensitiveWordsPage() {
               onClick={() => setActiveTab('list')}
               className={`px-6 py-2 rounded-xl font-medium transition-all duration-300 ${
                 activeTab === 'list'
-                  ? 'gradient-button'
-                  : 'glass-button text-white/60 hover:text-white'
+                  ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 text-white'
+                  : 'bg-white/5 border border-white/10 text-white/60 hover:text-white'
               }`}
             >
               词库列表
@@ -233,8 +233,8 @@ export default function SensitiveWordsPage() {
               onClick={() => setActiveTab('stats')}
               className={`px-6 py-2 rounded-xl font-medium transition-all duration-300 ${
                 activeTab === 'stats'
-                  ? 'gradient-button'
-                  : 'glass-button text-white/60 hover:text-white'
+                  ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 text-white'
+                  : 'bg-white/5 border border-white/10 text-white/60 hover:text-white'
               }`}
             >
               命中统计
@@ -248,7 +248,7 @@ export default function SensitiveWordsPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="glass-card overflow-hidden"
+                className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
               >
                 {isLoading ? (
                   <div className="p-12 text-center">
@@ -317,7 +317,7 @@ export default function SensitiveWordsPage() {
                 className="grid grid-cols-1 lg:grid-cols-3 gap-6"
               >
                 <div className="lg:col-span-2">
-                  <div className="glass-card p-6">
+                  <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-6">
                       <h3 className="text-lg font-semibold text-white">最近7天命中排行</h3>
                       <div className="px-4 py-2 rounded-lg bg-white/5 text-white/60 text-sm">
@@ -368,11 +368,11 @@ export default function SensitiveWordsPage() {
                         ))}
                       </div>
                     )}
-                  </glass-card>
+                  </div>
                 </div>
 
                 <div className="space-y-6">
-                  <div className="glass-card p-6">
+                  <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
                     <h3 className="text-lg font-semibold text-white mb-4">今日概览</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-4 rounded-xl bg-white/5">
@@ -386,7 +386,7 @@ export default function SensitiveWordsPage() {
                     </div>
                   </div>
 
-                  <div className="glass-card p-6">
+                  <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
                     <h3 className="text-lg font-semibold text-white mb-4">系统状态</h3>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
@@ -431,10 +431,10 @@ export default function SensitiveWordsPage() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md glass-card p-8"
+              className="relative w-full max-w-md bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8"
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gradient">添加敏感词</h2>
+                <h2 className="text-xl font-bold bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">添加敏感词</h2>
                 <motion.button
                   onClick={() => setIsAdding(false)}
                   className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-all"
@@ -453,7 +453,7 @@ export default function SensitiveWordsPage() {
                     value={newWord}
                     onChange={(e) => setNewWord(e.target.value)}
                     placeholder="请输入敏感词"
-                    className="w-full input-glass"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/40 focus:outline-none focus:border-cyan-400/50 transition-all"
                     maxLength={100}
                     autoFocus
                   />
@@ -466,7 +466,7 @@ export default function SensitiveWordsPage() {
                   className={`w-full py-4 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
                     !newWord.trim()
                       ? 'bg-white/5 text-white/30 cursor-not-allowed border border-white/10'
-                      : 'gradient-button'
+                      : 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 text-white'
                   }`}
                   whileHover={newWord.trim() && { scale: 1.02 }}
                   whileTap={newWord.trim() && { scale: 0.98 }}

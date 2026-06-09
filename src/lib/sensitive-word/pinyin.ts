@@ -9,7 +9,6 @@ const pinyinMap: Record<string, string[]> = {
   '品': ['pin'],
   '自': ['zi'],
   '杀': ['sha'],
-  '杀': ['sha'],
   '人': ['ren'],
   '抢': ['qiang'],
   '劫': ['jie'],
