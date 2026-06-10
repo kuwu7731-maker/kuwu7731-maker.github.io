@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Send, AlertCircle, CheckCircle, BookOpen, FileText, Sparkles } from 'lucide-react'
+import { ArrowLeft, Send, AlertCircle, CheckCircle, BookOpen, FileText, Sparkles, X, AlertTriangle, Home } from 'lucide-react'
 import Link from 'next/link'
-import { sensitiveWordService } from '@/lib/sensitive-word'
+import { freeContentFilter } from '@/lib/sensitive-word/free-content-filter'
 
 export default function CreatePostPage() {
   const [formData, setFormData] = useState({
@@ -12,16 +12,31 @@ export default function CreatePostPage() {
     title: '',
     content: '',
   })
-  const [validationResult, setValidationResult] = useState<{ hasBanned: boolean; hasSuspect: boolean; matches: { word: string; type: string }[] } | null>(null)
+  const [validationResult, setValidationResult] = useState<{ isBlocked: boolean; isWarning: boolean; blockedWords: string[]; warningWords: string[] } | null>(null)
+  const [showModal, setShowModal] = useState(false)
+  const [modalContent, setModalContent] = useState<{ type: 'block' | 'warning'; words: string[] } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
 
-  const handleInputChange = (field: 'title' | 'content', value: string) => {
-    setFormData({ ...formData, [field]: value })
-
-    const fullText = formData.title + ' ' + (field === 'title' ? value : formData.title) + ' ' + (field === 'content' ? value : formData.content)
-    const result = sensitiveWordService.validate(fullText)
+  const validateText = useCallback((text: string) => {
+    const result = freeContentFilter.filter(text)
     setValidationResult(result)
+    return result
+  }, [])
+
+  const handleInputChange = (field: 'title' | 'content', value: string) => {
+    const newData = { ...formData, [field]: value }
+    setFormData(newData)
+
+    const fullText = newData.title + ' ' + newData.content
+    const result = validateText(fullText)
+
+    if (result.isBlocked && result.blockedWords.length > 0 && !showModal) {
+      setModalContent({ type: 'block', words: result.blockedWords })
+      setShowModal(true)
+    } else if (result.isWarning && result.warningWords.length > 0) {
+      setModalContent({ type: 'warning', words: result.warningWords })
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,7 +46,12 @@ export default function CreatePostPage() {
       return
     }
 
-    if (validationResult?.hasBanned) {
+    const fullText = formData.title + ' ' + formData.content
+    const result = validateText(fullText)
+
+    if (result.isBlocked) {
+      setModalContent({ type: 'block', words: result.blockedWords })
+      setShowModal(true)
       return
     }
 
@@ -110,19 +130,39 @@ export default function CreatePostPage() {
                   transition={{ delay: 0.4 }}
                   className="text-white/60 mb-8"
                 >
-                  {validationResult?.hasSuspect ? '您的帖子需要审核，请耐心等待' : '您的帖子已成功发布'}
+                  {validationResult?.isWarning ? '您的帖子需要审核，请耐心等待' : '您的帖子已成功发布'}
                 </motion.p>
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.5 }}
+                  className="flex flex-col sm:flex-row items-center justify-center gap-4"
                 >
                   <Link
                     href="/"
                     className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-[#00E5FF] via-[#2979FF] to-[#D500F9] rounded-xl text-white font-medium shadow-[0_0_20px_rgba(0,229,255,0.4)] hover:shadow-[0_0_30px_rgba(0,229,255,0.6)] hover:scale-[1.02] transition-all"
                   >
-                    <ArrowLeft className="w-5 h-5" />
+                    <Home className="w-5 h-5" />
                     返回首页
+                  </Link>
+                  <Link
+                    href="/grade/7"
+                    className="inline-flex items-center gap-2 px-8 py-3 bg-white/10 border border-white/20 rounded-xl text-white font-medium hover:bg-white/20 hover:border-white/30 transition-all"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                    浏览帖子
+                  </Link>
+                  <Link
+                    href="/post/create"
+                    onClick={() => {
+                      setShowSuccess(false)
+                      setFormData({ grade: 7, title: '', content: '' })
+                      setValidationResult(null)
+                    }}
+                    className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-[#2979FF] to-[#D500F9] rounded-xl text-white font-medium shadow-[0_0_20px_rgba(41,121,255,0.4)] hover:shadow-[0_0_30px_rgba(41,121,255,0.6)] hover:scale-[1.02] transition-all"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                    发布新帖
                   </Link>
                 </motion.div>
               </motion.div>
@@ -175,17 +215,34 @@ export default function CreatePostPage() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 }}
+                    className="relative"
                   >
                     <label className="flex items-center gap-2 text-sm font-medium text-white/80 mb-3">
                       <FileText className="w-4 h-4" />
                       标题
+                      {validationResult?.isBlocked && (
+                        <motion.span
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="ml-2 px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded-full flex items-center gap-1"
+                        >
+                          <AlertCircle className="w-3 h-3" />
+                          包含违禁词
+                        </motion.span>
+                      )}
                     </label>
                     <input
                       type="text"
                       value={formData.title}
                       onChange={(e) => handleInputChange('title', e.target.value)}
                       placeholder="请输入帖子标题..."
-                      className="w-full px-4 py-4 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-[#00E5FF]/50 transition-colors"
+                      className={`w-full px-4 py-4 bg-white/5 border rounded-xl text-white placeholder-white/30 focus:outline-none transition-all ${
+                        validationResult?.isBlocked
+                          ? 'border-red-500/50 focus:border-red-500/50'
+                          : validationResult?.isWarning
+                          ? 'border-yellow-500/30 focus:border-yellow-500/30'
+                          : 'border-white/20 focus:border-[#00E5FF]/50'
+                      }`}
                       required
                     />
                     <p className="text-white/30 text-xs mt-2">标题应简洁明了，准确描述内容</p>
@@ -195,17 +252,34 @@ export default function CreatePostPage() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
+                    className="relative"
                   >
                     <label className="flex items-center gap-2 text-sm font-medium text-white/80 mb-3">
                       <Send className="w-4 h-4" />
                       内容
+                      {validationResult?.isBlocked && (
+                        <motion.span
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="ml-2 px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded-full flex items-center gap-1"
+                        >
+                          <AlertCircle className="w-3 h-3" />
+                          包含违禁词
+                        </motion.span>
+                      )}
                     </label>
                     <textarea
                       value={formData.content}
                       onChange={(e) => handleInputChange('content', e.target.value)}
                       placeholder="请输入帖子内容..."
                       rows={12}
-                      className="w-full px-4 py-4 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-[#00E5FF]/50 transition-colors resize-none"
+                      className={`w-full px-4 py-4 bg-white/5 border rounded-xl text-white placeholder-white/30 focus:outline-none transition-all resize-none ${
+                        validationResult?.isBlocked
+                          ? 'border-red-500/50 focus:border-red-500/50'
+                          : validationResult?.isWarning
+                          ? 'border-yellow-500/30 focus:border-yellow-500/30'
+                          : 'border-white/20 focus:border-[#00E5FF]/50'
+                      }`}
                       required
                     />
                     <div className="flex justify-between items-center mt-2">
@@ -215,13 +289,13 @@ export default function CreatePostPage() {
                   </motion.div>
 
                   <AnimatePresence>
-                    {validationResult && (validationResult.hasBanned || validationResult.hasSuspect) && (
+                    {validationResult && (validationResult.isBlocked || validationResult.isWarning) && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
                         className={`p-5 rounded-xl border ${
-                          validationResult.hasBanned
+                          validationResult.isBlocked
                             ? 'bg-red-500/10 border-red-500/30'
                             : 'bg-yellow-500/10 border-yellow-500/30'
                         }`}
@@ -231,32 +305,45 @@ export default function CreatePostPage() {
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                              validationResult.hasBanned ? 'bg-red-500/20' : 'bg-yellow-500/20'
+                              validationResult.isBlocked ? 'bg-red-500/20' : 'bg-yellow-500/20'
                             }`}
                           >
-                            <AlertCircle className={`w-5 h-5 ${validationResult.hasBanned ? 'text-red-400' : 'text-yellow-400'}`} />
+                            {validationResult.isBlocked ? (
+                              <AlertCircle className="w-5 h-5 text-red-400" />
+                            ) : (
+                              <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                            )}
                           </motion.div>
                           <div>
-                            <span className={`font-medium ${validationResult.hasBanned ? 'text-red-400' : 'text-yellow-400'}`}>
-                              {validationResult.hasBanned ? '内容包含违禁词汇' : '内容包含疑似违规词汇'}
+                            <span className={`font-medium ${validationResult.isBlocked ? 'text-red-400' : 'text-yellow-400'}`}>
+                              {validationResult.isBlocked ? '内容包含违禁词汇' : '内容包含需要注意的词语'}
                             </span>
-                            <p className="text-white/40 text-xs">请修改后再发布</p>
+                            <p className="text-white/40 text-xs">
+                              {validationResult.isBlocked ? '请修改后再发布' : '请注意发言规范'}
+                            </p>
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {validationResult.matches.map((match, index) => (
+                          {validationResult.blockedWords.map((word, index) => (
                             <motion.span
-                              key={index}
+                              key={`block-${index}`}
                               initial={{ scale: 0 }}
                               animate={{ scale: 1 }}
                               transition={{ delay: index * 0.05 }}
-                              className={`px-3 py-1.5 rounded-full text-sm ${
-                                match.type === 'banned'
-                                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                  : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                              }`}
+                              className="px-3 py-1.5 rounded-full text-sm bg-red-500/20 text-red-400 border border-red-500/30"
                             >
-                              {match.word}
+                              {word}
+                            </motion.span>
+                          ))}
+                          {validationResult.warningWords.map((word, index) => (
+                            <motion.span
+                              key={`warn-${index}`}
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ delay: index * 0.05 }}
+                              className="px-3 py-1.5 rounded-full text-sm bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+                            >
+                              {word}
                             </motion.span>
                           ))}
                         </div>
@@ -271,9 +358,9 @@ export default function CreatePostPage() {
                   >
                     <button
                       type="submit"
-                      disabled={isSubmitting || !formData.title.trim() || !formData.content.trim() || validationResult?.hasBanned}
+                      disabled={isSubmitting || !formData.title.trim() || !formData.content.trim() || validationResult?.isBlocked}
                       className={`w-full py-4 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
-                        isSubmitting || !formData.title.trim() || !formData.content.trim() || validationResult?.hasBanned
+                        isSubmitting || !formData.title.trim() || !formData.content.trim() || validationResult?.isBlocked
                           ? 'bg-white/5 text-white/40 cursor-not-allowed border border-white/10'
                           : 'bg-gradient-to-r from-[#00E5FF] via-[#2979FF] to-[#D500F9] text-white shadow-[0_0_20px_rgba(0,229,255,0.4)] hover:shadow-[0_0_30px_rgba(0,229,255,0.6)] hover:scale-[1.02]'
                       }`}
@@ -290,7 +377,7 @@ export default function CreatePostPage() {
                       ) : (
                         <>
                           <Send className="w-5 h-5" />
-                          {validationResult?.hasSuspect ? '发布（需审核）' : '立即发布'}
+                          {validationResult?.isWarning ? '发布（需审核）' : '立即发布'}
                         </>
                       )}
                     </button>
@@ -308,6 +395,114 @@ export default function CreatePostPage() {
       <footer className="border-t border-white/10 py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 text-center text-white/30 text-sm">实验中学论坛 © 2024</div>
       </footer>
+
+      <AnimatePresence>
+        {showModal && modalContent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            onClick={() => setShowModal(false)}
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative bg-gradient-to-br from-[#1a1a2e] to-[#16213e] border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-[0_0_60px_rgba(239,68,68,0.2)]"
+            >
+              <motion.button
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2 }}
+                onClick={() => setShowModal(false)}
+                className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5 text-white/60" />
+              </motion.button>
+
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.1 }}
+                className={`w-16 h-16 mx-auto mb-6 rounded-2xl flex items-center justify-center ${
+                  modalContent.type === 'block'
+                    ? 'bg-gradient-to-br from-red-500/30 to-red-600/30 shadow-[0_0_30px_rgba(239,68,68,0.3)]'
+                    : 'bg-gradient-to-br from-yellow-500/30 to-yellow-600/30 shadow-[0_0_30px_rgba(234,179,8,0.3)]'
+                }`}
+              >
+                {modalContent.type === 'block' ? (
+                  <AlertCircle className="w-8 h-8 text-red-400" />
+                ) : (
+                  <AlertTriangle className="w-8 h-8 text-yellow-400" />
+                )}
+              </motion.div>
+
+              <motion.h3
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className={`text-xl font-bold text-center mb-3 ${
+                  modalContent.type === 'block' ? 'text-red-400' : 'text-yellow-400'
+                }`}
+              >
+                {modalContent.type === 'block' ? '内容包含违禁词汇' : '内容包含需要注意的词语'}
+              </motion.h3>
+
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-white/60 text-center mb-6"
+              >
+                {modalContent.type === 'block'
+                  ? '您输入的内容包含以下违禁词汇，请修改后再发布'
+                  : '您输入的内容包含以下需要注意的词语，请谨慎发言'}
+              </motion.p>
+
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                className="flex flex-wrap justify-center gap-2 mb-8"
+              >
+                {modalContent.words.map((word, index) => (
+                  <motion.span
+                    key={index}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.4 + index * 0.05 }}
+                    className={`px-4 py-2 rounded-full text-sm font-medium ${
+                      modalContent.type === 'block'
+                        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                        : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                    }`}
+                  >
+                    {word}
+                  </motion.span>
+                ))}
+              </motion.div>
+
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5 }}
+                onClick={() => setShowModal(false)}
+                className={`w-full py-3 rounded-xl font-semibold transition-all ${
+                  modalContent.type === 'block'
+                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                    : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30'
+                }`}
+              >
+                我知道了
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -58,8 +58,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           code: 403,
-          msg: '内容包含违规词',
-          words: filterResult.matchedWords,
+          msg: filterResult.message,
+          words: filterResult.blockedWords,
         },
         { status: 403 }
       )
@@ -75,6 +75,22 @@ export async function POST(request: NextRequest) {
       },
       include: { user: { select: { name: true } } },
     })
+
+    if (filterResult.isWarning) {
+      await prisma.sensitiveWordLog.create({
+        data: {
+          wordId: 'filter-warn',
+          content: title.substring(0, 200),
+          userId,
+          action: 'warn',
+        },
+      })
+
+      return NextResponse.json(
+        { code: 200, msg: filterResult.message, post, warning: true },
+        { status: 201 }
+      )
+    }
 
     return NextResponse.json(
       { code: 200, msg: '发布成功', post },

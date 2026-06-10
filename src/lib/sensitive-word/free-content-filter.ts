@@ -9,76 +9,75 @@ export interface TrieNode {
 
 export interface FilterResult {
   isBlocked: boolean
-  matchedWords: string[]
+  isWarning: boolean
+  blockedWords: string[]
+  warningWords: string[]
   message: string
 }
 
 export class FreeContentFilter {
-  private root: TrieNode = { children: new Map(), isEnd: false }
-  private pinyinMap: Record<string, string[]> = {}
-  private zeroWidthChars = ['\u200B', '\u200C', '\u200D', '\uFEFF', '\u2060', '\u180E']
+  private blockRoot: TrieNode = { children: new Map(), isEnd: false }
+  private warnRoot: TrieNode = { children: new Map(), isEnd: false }
+  private blockWords: string[] = []
+  private warnWords: string[] = []
 
   constructor() {
     this.loadWords()
   }
 
+  private getWordFilePath(fileName: string): string {
+    const possiblePaths = [
+      path.join(process.cwd(), 'data', fileName),
+      path.join(process.cwd(), '..', 'data', fileName),
+      path.join(__dirname, '..', '..', '..', 'data', fileName),
+      path.join(__dirname, '..', '..', 'data', fileName),
+      path.join('/app', 'data', fileName),
+    ]
+
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        return p
+      }
+    }
+    return path.join(process.cwd(), 'data', fileName)
+  }
+
   private loadWords() {
     try {
-      const wordsPath = path.join(process.cwd(), 'data', 'clean-base-words.txt')
-      if (fs.existsSync(wordsPath)) {
-        const content = fs.readFileSync(wordsPath, 'utf-8')
-        const words = content.split('\n').map(w => w.trim()).filter(w => w.length >= 2)
-        this.buildTrie(words)
-        this.buildPinyinMap()
-        console.log(`[FreeContentFilter] 加载了 ${words.length} 个敏感词`)
+      const blockPath = this.getWordFilePath('block-words.txt')
+      const warnPath = this.getWordFilePath('warn-words.txt')
+
+      if (fs.existsSync(blockPath)) {
+        const content = fs.readFileSync(blockPath, 'utf-8')
+        this.blockWords = content.split('\n').map(w => w.trim()).filter(w => w.length >= 1)
       } else {
+        this.blockWords = this.getDefaultBlockWords()
         console.log('[FreeContentFilter] 词库文件不存在，使用默认词库')
-        this.buildTrie(this.getDefaultWords())
-        this.buildPinyinMap()
       }
+
+      if (fs.existsSync(warnPath)) {
+        const content = fs.readFileSync(warnPath, 'utf-8')
+        this.warnWords = content.split('\n').map(w => w.trim()).filter(w => w.length >= 1)
+      } else {
+        this.warnWords = this.getDefaultWarnWords()
+      }
+
+      this.buildTrie(this.blockWords, this.blockRoot)
+      this.buildTrie(this.warnWords, this.warnRoot)
+      console.log(`[FreeContentFilter] 加载了 ${this.blockWords.length} 个拦截词，${this.warnWords.length} 个警告词`)
     } catch (error) {
       console.error('[FreeContentFilter] 加载词库失败:', error)
-      this.buildTrie(this.getDefaultWords())
-      this.buildPinyinMap()
+      this.blockWords = this.getDefaultBlockWords()
+      this.warnWords = this.getDefaultWarnWords()
+      this.buildTrie(this.blockWords, this.blockRoot)
+      this.buildTrie(this.warnWords, this.warnRoot)
     }
   }
 
-  private getDefaultWords(): string[] {
-    return [
-      '暴力', '色情', '赌博', '毒品', '自杀', '杀人', '抢劫', '诈骗',
-      '违法', '违规', '邪教', '恐怖', '反动', '分裂', '台独', '藏独',
-      '法轮功', '卖淫', '嫖娼', '强奸', '乱伦', '兽交', '恋童',
-      '血腥', '自残', '斗殴', '绑架', '勒索', '纵火', '爆炸',
-      '贪污', '腐败', '受贿', '洗钱', '走私', '贩毒', '吸毒',
-      '黑客', '攻击', '入侵', '病毒', '木马', '钓鱼', '造谣',
-      '谣言', '诽谤', '煽动', '仇恨', '歧视', '偏见',
-      '色情网站', '成人网站', '黄色网站', '淫秽', '露骨', '挑逗',
-      '赌博网站', '博彩', '彩票', '赌球', '赌马', '六合彩',
-      '毒品交易', '冰毒', '海洛因', '大麻', '摇头丸', '鸦片',
-      '枪支', '弹药', '管制刀具', '武器', '凶器',
-      '色情图片', '色情视频', '成人影片', 'AV', '色情小说',
-      '政治敏感', '敏感事件', '敏感人物', '敏感话题',
-      '辱骂', '脏话', '粗口', '侮辱性', '攻击性', '威胁性',
-      '人肉搜索', '隐私泄露', '个人信息', '身份证', '手机号',
-      '广告', '推广', '营销', '引流', '刷单', '返利',
-      '钓鱼网站', '欺诈', '虚假信息', '骗局', '传销', '非法集资',
-      '反动言论', '颠覆', '煽动颠覆', '危害国家安全',
-      '极端主义', '恐怖主义', '圣战', 'ISIS', '基地组织',
-      '种族歧视', '性别歧视', '地域歧视', '年龄歧视', '残障歧视',
-      '校园霸凌', '校园暴力', '欺凌', '殴打', '排挤',
-      '自杀倾向', '自虐', '轻生', '绝望', '抑郁',
-      '暴力游戏', '血腥游戏', '恐怖游戏', '杀人游戏',
-      '暴力电影', '血腥电影', '恐怖电影',
-      'baoli', 'seqing', 'dubo', 'dupin', 'zisha', 'sharen',
-      'qiangjie', 'zhapian', 'weifa', 'weigui', 'xiejiao', 'kongbu',
-    ]
-  }
-
-  private buildTrie(words: string[]) {
-    this.root = { children: new Map(), isEnd: false }
+  private buildTrie(words: string[], root: TrieNode) {
     for (const word of words) {
       if (!word.trim()) continue
-      let node = this.root
+      let node = root
       for (const char of word) {
         if (!node.children.has(char)) {
           node.children.set(char, { children: new Map(), isEnd: false })
@@ -90,88 +89,12 @@ export class FreeContentFilter {
     }
   }
 
-  private buildPinyinMap() {
-    this.pinyinMap = {
-      '暴': ['bao'], '力': ['li'], '色': ['se'], '情': ['qing'],
-      '赌': ['du'], '博': ['bo'], '毒': ['du'], '品': ['pin'],
-      '自': ['zi'], '杀': ['sha'], '人': ['ren'], '抢': ['qiang'],
-      '劫': ['jie'], '诈': ['zha'], '骗': ['pian'], '违': ['wei'],
-      '法': ['fa'], '规': ['gui'], '邪': ['xie'], '教': ['jiao'],
-      '恐': ['kong'], '怖': ['bu'], '反': ['fan'], '动': ['dong'],
-      '分': ['fen'], '裂': ['lie'], '台': ['tai'], '独': ['du'],
-      '藏': ['cang'], '轮': ['lun'], '功': ['gong'],
-      '卖': ['mai'], '淫': ['yin'], '嫖': ['piao'], '娼': ['chang'],
-      '奸': ['jian'], '乱': ['luan'],
-      '兽': ['shou'], '交': ['jiao'], '恋': ['lian'], '童': ['tong'],
-      '血': ['xue'], '腥': ['xing'], '残': ['can'], '斗': ['dou'],
-      '殴': ['ou'], '绑': ['bang'], '架': ['jia'], '勒': ['le'],
-      '索': ['suo'], '纵': ['zong'], '火': ['huo'],
-      '炸': ['zha'], '贪': ['tan'], '污': ['wu'], '腐': ['fu'],
-      '败': ['bai'], '受': ['shou'], '贿': ['hui'],
-      '钱': ['qian'], '走': ['zou'], '私': ['si'], '贩': ['fan'],
-      '吸': ['xi'], '黑': ['hei'], '客': ['ke'],
-      '入': ['ru'], '侵': ['qin'], '病': ['bing'], '木': ['mu'],
-      '马': ['ma'], '钓': ['diao'], '谣': ['yao'], '言': ['yan'],
-      '诽': ['fei'], '谤': ['bang'], '造': ['zao'], '煽': ['shan'],
-      '仇': ['chou'], '恨': ['hen'], '歧': ['qi'], '视': ['shi'],
-      '偏': ['pian'], '见': ['jian'], '秽': ['hui'], '露': ['lu'],
-      '骨': ['gu'], '挑': ['tiao'], '逗': ['dou'], '彩': ['cai'],
-      '票': ['piao'], '球': ['qiu'], '六': ['liu'],
-      '合': ['he'], '易': ['yi'], '冰': ['bing'], '海': ['hai'],
-      '洛': ['luo'], '因': ['yin'], '大': ['da'], '麻': ['ma'],
-      '摇': ['yao'], '头': ['tou'], '丸': ['wan'], '鸦': ['ya'],
-      '片': ['pian'], '枪': ['qiang'], '支': ['zhi'], '弹': ['dan'],
-      '管': ['guan'], '制': ['zhi'], '刀': ['dao'],
-      '具': ['ju'], '武': ['wu'], '器': ['qi'], '凶': ['xiong'],
-      '图': ['tu'], '频': ['pin'], '影': ['ying'],
-      '政': ['zheng'], '治': ['zhi'], '事': ['shi'], '件': ['jian'],
-      '物': ['wu'], '话': ['hua'], '题': ['ti'], '辱': ['ru'],
-      '脏': ['zang'], '粗': ['cu'], '口': ['kou'],
-      '侮': ['wu'], '性': ['xing'], '击': ['ji'], '威': ['wei'],
-      '胁': ['xie'], '肉': ['rou'], '搜': ['sou'],
-      '隐': ['yin'], '泄': ['xie'], '广': ['guang'], '告': ['gao'],
-      '推': ['tui'], '营': ['ying'], '销': ['xiao'], '引': ['yin'],
-      '流': ['liu'], '刷': ['shua'], '单': ['dan'], '返': ['fan'],
-      '利': ['li'], '欺': ['qi'], '虚': ['xu'], '假': ['jia'],
-      '信': ['xin'], '局': ['ju'], '传': ['chuan'],
-      '非': ['fei'], '集': ['ji'], '资': ['zi'], '颠': ['dian'],
-      '覆': ['fu'], '极': ['ji'], '端': ['duan'], '主': ['zhu'],
-      '义': ['yi'], '圣': ['sheng'], '战': ['zhan'], '种': ['zhong'],
-      '族': ['zu'], '年': ['nian'], '龄': ['ling'], '障': ['zhang'],
-      '校': ['xiao'], '园': ['yuan'], '霸': ['ba'], '凌': ['ling'],
-      '倾': ['qing'], '向': ['xiang'], '虐': ['nue'], '轻': ['qing'],
-      '生': ['sheng'], '绝': ['jue'], '望': ['wang'], '抑': ['yi'],
-      '郁': ['yu'], '游': ['you'], '戏': ['xi'],
-    }
-  }
-
-  private removeZeroWidthChars(text: string): string {
-    let result = text
-    for (const char of this.zeroWidthChars) {
-      result = result.replace(new RegExp(char, 'g'), '')
-    }
-    return result
-  }
-
-  private textToPinyin(text: string): string {
-    let result = ''
-    for (const char of text) {
-      const pinyins = this.pinyinMap[char]
-      if (pinyins && pinyins.length > 0) {
-        result += pinyins[0]
-      } else {
-        result += char
-      }
-    }
-    return result
-  }
-
-  private dfaMatch(text: string): string[] {
+  private dfaMatch(text: string, root: TrieNode): string[] {
     const matches: string[] = []
     const len = text.length
 
     for (let i = 0; i < len; i++) {
-      let node = this.root
+      let node = root
       let j = i
 
       while (j < len && node.children.has(text[j])) {
@@ -189,74 +112,186 @@ export class FreeContentFilter {
     return matches
   }
 
-  filter(text: string): FilterResult {
-    const cleanText = this.removeZeroWidthChars(text)
-    
-    const directMatches = this.dfaMatch(cleanText)
-    
-    const pinyinText = this.textToPinyin(cleanText)
-    const pinyinMatches = this.dfaMatch(pinyinText)
-    
-    const allMatches = [...new Set([...directMatches, ...pinyinMatches])]
+  private getDefaultBlockWords(): string[] {
+    const singleChar = [
+      '操', '草', '日', '妈', '逼', '屌', '屁', '屎',
+      '尿', '粪', '奸', '淫', '毒', '赌', '嫖', '骗',
+      '抢', '杀', '偷', '盗', '炸', '烧', '砍', '打',
+      '骂', '秽', '裸', '暴', '恐', '邪', '黑', '诈',
+      '贪', '腐', '贿', '枪', '弹', '刀', '凶',
+    ]
 
-    if (allMatches.length > 0) {
+    const twoChar = [
+      '暴力', '色情', '赌博', '毒品', '自杀', '杀人', '抢劫', '诈骗',
+      '违法', '违规', '邪教', '恐怖', '反动', '分裂', '台独', '藏独',
+      '卖淫', '嫖娼', '强奸', '乱伦', '兽交', '恋童', '血腥', '自残',
+      '斗殴', '绑架', '勒索', '纵火', '爆炸', '贪污', '腐败', '受贿',
+      '洗钱', '走私', '贩毒', '吸毒', '黑客', '攻击', '入侵', '病毒',
+      '木马', '钓鱼', '造谣', '谣言', '诽谤', '煽动', '仇恨', '歧视',
+      '淫秽', '露骨', '挑逗', '博彩', '枪支', '弹药', '管制', '武器',
+      '凶器', '辱骂', '脏话', '粗口', '威胁', '人肉', '隐私', '广告',
+      '推广', '营销', '引流', '刷单', '返利', '欺诈', '虚假', '骗局',
+      '传销', '颠覆', '圣战', '霸凌', '欺凌', '偷拍', '偷窥', '骚扰',
+      '侮辱', '殴打', '恐吓', '敲诈', '勒索', '盗窃',
+    ]
+
+    const multiChar = [
+      '法轮功', '六合彩', '冰毒', '海洛因', '摇头丸', '色情网站',
+      '成人网站', '黄色网站', '赌博网站', '毒品交易', '色情图片',
+      '色情视频', '成人影片', '色情小说', '政治敏感', '敏感事件',
+      '敏感人物', '敏感话题', '侮辱性', '攻击性', '威胁性',
+      '人肉搜索', '隐私泄露', '个人信息', '身份证', '手机号',
+      '钓鱼网站', '虚假信息', '非法集资', '反动言论', '煽动颠覆',
+      '危害国家安全', '极端主义', '恐怖主义', 'ISIS', '基地组织',
+      '种族歧视', '性别歧视', '地域歧视', '年龄歧视', '残障歧视',
+      '校园霸凌', '校园暴力', '自杀倾向', '暴力游戏', '血腥游戏',
+      '恐怖游戏', '杀人游戏', '暴力电影', '血腥电影', '恐怖电影',
+    ]
+
+    const pinyin = [
+      'baoli', 'seqing', 'dubo', 'dupin', 'zisha', 'sharen', 'qiangjie',
+      'zhapian', 'weifa', 'weigui', 'xiejiao', 'kongbu', 'fandong',
+      'fenlie', 'taiwan', 'cangdu', 'falungong', 'maiyin', 'piaochang',
+      'qiangjian', 'luanlun', 'shoujiao', 'liantong', 'xuexing', 'zican',
+      'douou', 'bangjia', 'lesuo', 'zonghuo', 'baozha', 'tanwu', 'fubai',
+      'shouhui', 'xiqian', 'zousi', 'xidu', 'heike', 'gongji', 'ruqin',
+      'bingdu', 'muma', 'diaoyu', 'zaoyao', 'feibang', 'sandong',
+      'chouhen', 'qishi', 'pianjian', 'lugut', 'tiaodou', 'bocai',
+      'caipiao', 'duqiu', 'gupiao', 'qiangzhi', 'wuqi', 'xiongqi',
+      'ruma', 'zanghua', 'cukou', 'weixie', 'renrou', 'yinsi', 'guanggao',
+      'tuiguang', 'yingxiao', 'yinliu', 'shuadan', 'fanli', 'qiya',
+      'xuji', 'pianju', 'chuanxiao', 'dianfu', 'shengzhan', 'qingpie',
+      'ziwen', 'qingsheng', 'juewang', 'yiyu', 'luoliao', 'luoben',
+      'toupai', 'toukou', 'saorao', 'wuru', 'ouchong', 'kongxia',
+      'qiaozha', 'daoqie',
+    ]
+
+    return [...singleChar, ...twoChar, ...multiChar, ...pinyin]
+  }
+
+  private getDefaultWarnWords(): string[] {
+    return [
+      '老师', '校长', '班主任', '教导主任', '学生', '同学', '早恋',
+      '暗恋', '表白', '情书', '约会', '牵手', '恋爱', '男女朋友',
+      '分手', '失恋', '追星', '偶像', '游戏', '电竞', '网游', '手游',
+      '竞技', '比赛', '聊天', '交友', '社交', '聚会', '活动', '社团',
+      '心理健康', '心理咨询', '心理辅导', '情绪', '压力', '焦虑', '抑郁',
+      '成长', '青春期', '叛逆', '补课', '补习', '培训', '辅导班',
+      '兴趣班', '特长班', '作业', '考试', '成绩', '分数', '课程',
+      '课堂', '教室', '学校', '校园', '操场', '图书馆', '食堂', '宿舍',
+      '体育馆', '运动会', '艺术节', '科技节', '校庆', '毕业典礼', '开学典礼',
+      '少先队', '共青团', '学生会', '班干部', '班长', '团支书',
+      '学习', '复习', '预习', '作业', '考试', '测验', '考试', '作业',
+      '成绩', '分数', '排名', '升学', '中考', '高考', '复习资料', '参考书',
+    ]
+  }
+
+  filter(text: string): FilterResult {
+    const blockMatches = this.dfaMatch(text, this.blockRoot)
+    const warnMatches = this.dfaMatch(text, this.warnRoot)
+
+    if (blockMatches.length > 0) {
       return {
         isBlocked: true,
-        matchedWords: allMatches,
-        message: '内容包含违规词',
+        isWarning: false,
+        blockedWords: blockMatches,
+        warningWords: [],
+        message: `内容包含违规词：${blockMatches.join(', ')}`,
+      }
+    }
+
+    if (warnMatches.length > 0) {
+      return {
+        isBlocked: false,
+        isWarning: true,
+        blockedWords: [],
+        warningWords: warnMatches,
+        message: `内容包含需要注意的词语：${warnMatches.join(', ')}，请注意发言规范`,
       }
     }
 
     return {
       isBlocked: false,
-      matchedWords: [],
+      isWarning: false,
+      blockedWords: [],
+      warningWords: [],
       message: '内容合规',
     }
   }
 
-  async addWords(words: string[]): Promise<void> {
-    const cleanWords = words.filter(w => w.trim().length >= 2)
-    
-    const wordsPath = path.join(process.cwd(), 'data', 'clean-base-words.txt')
+  async addBlockWords(words: string[]): Promise<void> {
+    const cleanWords = words.filter(w => w.trim().length >= 1)
+    const blockPath = this.getWordFilePath('block-words.txt')
+
     let existingWords: string[] = []
-    
-    if (fs.existsSync(wordsPath)) {
-      const content = fs.readFileSync(wordsPath, 'utf-8')
-      existingWords = content.split('\n').map(w => w.trim()).filter(w => w.length >= 2)
+    if (fs.existsSync(blockPath)) {
+      const content = fs.readFileSync(blockPath, 'utf-8')
+      existingWords = content.split('\n').map(w => w.trim()).filter(w => w.length >= 1)
     }
-    
+
     const existingSet = new Set(existingWords)
     const newWords = cleanWords.filter(w => !existingSet.has(w))
-    
+
     if (newWords.length > 0) {
-      fs.appendFileSync(wordsPath, '\n' + newWords.join('\n'), 'utf-8')
+      fs.appendFileSync(blockPath, '\n' + newWords.join('\n'), 'utf-8')
       this.loadWords()
-      console.log(`[FreeContentFilter] 添加了 ${newWords.length} 个新敏感词`)
+      console.log(`[FreeContentFilter] 添加了 ${newWords.length} 个拦截词`)
     }
   }
 
-  async removeWord(word: string): Promise<void> {
-    const wordsPath = path.join(process.cwd(), 'data', 'clean-base-words.txt')
-    
-    if (!fs.existsSync(wordsPath)) return
-    
-    const content = fs.readFileSync(wordsPath, 'utf-8')
-    const words = content.split('\n').map(w => w.trim()).filter(w => w !== word && w.length >= 2)
-    
-    fs.writeFileSync(wordsPath, words.join('\n'), 'utf-8')
+  async addWarnWords(words: string[]): Promise<void> {
+    const cleanWords = words.filter(w => w.trim().length >= 1)
+    const warnPath = this.getWordFilePath('warn-words.txt')
+
+    let existingWords: string[] = []
+    if (fs.existsSync(warnPath)) {
+      const content = fs.readFileSync(warnPath, 'utf-8')
+      existingWords = content.split('\n').map(w => w.trim()).filter(w => w.length >= 1)
+    }
+
+    const existingSet = new Set(existingWords)
+    const newWords = cleanWords.filter(w => !existingSet.has(w))
+
+    if (newWords.length > 0) {
+      fs.appendFileSync(warnPath, '\n' + newWords.join('\n'), 'utf-8')
+      this.loadWords()
+      console.log(`[FreeContentFilter] 添加了 ${newWords.length} 个警告词`)
+    }
+  }
+
+  async removeWord(word: string, type: 'block' | 'warn'): Promise<void> {
+    const pathStr = type === 'block'
+      ? this.getWordFilePath('block-words.txt')
+      : this.getWordFilePath('warn-words.txt')
+
+    if (!fs.existsSync(pathStr)) return
+
+    const content = fs.readFileSync(pathStr, 'utf-8')
+    const words = content.split('\n').map(w => w.trim()).filter(w => w !== word && w.length >= 1)
+
+    fs.writeFileSync(pathStr, words.join('\n'), 'utf-8')
     this.loadWords()
-    console.log(`[FreeContentFilter] 删除了敏感词: ${word}`)
+    console.log(`[FreeContentFilter] 删除了${type === 'block' ? '拦截' : '警告'}词: ${word}`)
   }
 
-  async getWordCount(): Promise<number> {
-    const wordsPath = path.join(process.cwd(), 'data', 'clean-base-words.txt')
-    
-    if (!fs.existsSync(wordsPath)) {
-      return this.getDefaultWords().length
+  async getWordCount(): Promise<{ block: number; warn: number }> {
+    const blockPath = this.getWordFilePath('block-words.txt')
+    const warnPath = this.getWordFilePath('warn-words.txt')
+
+    let blockCount = this.getDefaultBlockWords().length
+    let warnCount = this.getDefaultWarnWords().length
+
+    if (fs.existsSync(blockPath)) {
+      const content = fs.readFileSync(blockPath, 'utf-8')
+      blockCount = content.split('\n').filter(w => w.trim().length >= 1).length
     }
-    
-    const content = fs.readFileSync(wordsPath, 'utf-8')
-    return content.split('\n').filter(w => w.trim().length >= 2).length
+
+    if (fs.existsSync(warnPath)) {
+      const content = fs.readFileSync(warnPath, 'utf-8')
+      warnCount = content.split('\n').filter(w => w.trim().length >= 1).length
+    }
+
+    return { block: blockCount, warn: warnCount }
   }
 }
 

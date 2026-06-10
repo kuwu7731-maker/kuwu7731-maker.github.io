@@ -17,15 +17,10 @@ const stats = [
   { label: '敏感词拦截', value: '234', icon: TrendingUp },
 ]
 
-const hotPosts = [
-  { id: 1, title: '七年级数学学习方法分享', time: '1小时前', views: 128 },
-  { id: 2, title: '八年级物理竞赛经验', time: '2小时前', views: 96 },
-  { id: 3, title: '中考志愿填报指南2024', time: '3小时前', views: 256 },
-  { id: 4, title: '心理健康讲座回顾', time: '5小时前', views: 64 },
-  { id: 5, title: '新学期社团招新公告', time: '昨天', views: 156 },
-]
-
 export default function HomePage() {
+  const [hotPosts, setHotPosts] = useState([
+    { id: '1', title: '加载中...', createdAt: new Date().toISOString(), viewCount: 0, user: { name: '' } },
+  ])
   const [mobileMenu, setMobileMenu] = useState(false)
   const [user, setUser] = useState<any>(null)
 
@@ -34,6 +29,19 @@ export default function HomePage() {
     if (userData) {
       setUser(JSON.parse(userData))
     }
+
+    const fetchHotPosts = async () => {
+      try {
+        const res = await fetch('/api/posts?limit=5')
+        const data = await res.json()
+        if (data.posts) {
+          setHotPosts(data.posts)
+        }
+      } catch (error) {
+        console.error('获取热门帖子失败', error)
+      }
+    }
+    fetchHotPosts()
   }, [])
 
   const handleLogout = () => {
@@ -197,17 +205,20 @@ export default function HomePage() {
 
             <div className="space-y-4">
               {hotPosts.map((post, idx) => (
-                <motion.div key={post.id} initial={{opacity:0,x:-20}} animate={{opacity:1,x:0}} transition={{delay:idx*0.05}} className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-5 flex items-center gap-4 hover:border-white/20 hover:-translate-y-1 transition-all cursor-pointer">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00E5FF]/10 to-[#2979FF]/10 flex items-center justify-center text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#00E5FF] to-[#D500F9]">{idx+1}</div>
-                  <div className="flex-1">
-                    <h3 className="text-white font-medium">{post.title}</h3>
-                    <div className="flex items-center gap-4 mt-1 text-white/40 text-sm">
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{post.time}</span>
-                      <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{post.views}</span>
+                <Link key={post.id} href={`/post/${post.id}`}>
+                  <motion.div initial={{opacity:0,x:-20}} animate={{opacity:1,x:0}} transition={{delay:idx*0.05}} className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-5 flex items-center gap-4 hover:border-white/20 hover:-translate-y-1 transition-all cursor-pointer">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00E5FF]/10 to-[#2979FF]/10 flex items-center justify-center text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#00E5FF] to-[#D500F9]">{idx+1}</div>
+                    <div className="flex-1">
+                      <h3 className="text-white font-medium">{post.title}</h3>
+                      <div className="flex items-center gap-4 mt-1 text-white/40 text-sm">
+                        <span>{post.user?.name || '匿名'}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(post.createdAt).toLocaleDateString('zh-CN')}</span>
+                        <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{post.viewCount || 0}</span>
+                      </div>
                     </div>
-                  </div>
-                  <ArrowRight className="w-5 h-5 text-white/40" />
-                </motion.div>
+                    <ArrowRight className="w-5 h-5 text-white/40" />
+                  </motion.div>
+                </Link>
               ))}
             </div>
           </div>

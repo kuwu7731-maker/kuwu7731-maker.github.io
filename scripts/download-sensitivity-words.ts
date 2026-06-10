@@ -1,5 +1,8 @@
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const FALSE_POSITIVE_WORDS = [
   '同志', '激情', '小姐', '菊花', '黄瓜', '木耳', '鲍鱼', '百合', '攻', '受',
@@ -22,61 +25,105 @@ const CAMPUS_BULLYING_WORDS = [
   '校园暴力', '校园欺凌', '霸凌者', '受害者', '施暴',
 ]
 
+const GITEE_SENSITIVE_WORD_URLS = [
+  'https://gitee.com/api/v5/repos/JK9021/SensitiveWordsFilter/contents/data/SensitiveWords.txt?ref=master',
+  'https://gitee.com/api/v5/repos/observerss/textfilter/contents/data/badwords.txt?ref=master',
+]
+
+async function fetchFromGitee(url: string): Promise<string[]> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    })
+    if (!response.ok) {
+      console.log(`Gitee请求失败: ${url}, 使用内置词库`)
+      return []
+    }
+    const data = await response.json()
+    if (data.content) {
+      const decoded = Buffer.from(data.content, 'base64').toString('utf-8')
+      return decoded.split('\n').map(w => w.trim()).filter(w => w.length >= 1)
+    }
+    return []
+  } catch (error) {
+    console.log(`Gitee请求异常: ${url}, 使用内置词库`)
+    return []
+  }
+}
+
 async function downloadSensitiveWords(): Promise<string[]> {
   const words: string[] = []
   
-  const baseWords = [
-    '暴力', '色情', '赌博', '毒品', '自杀', '杀人', '抢劫', '诈骗',
-    '违法', '违规', '邪教', '恐怖', '反动', '分裂', '台独', '藏独',
-    '法轮功', '卖淫', '嫖娼', '强奸', '乱伦', '兽交', '恋童',
-    '血腥', '自残', '斗殴', '绑架', '勒索', '纵火', '爆炸',
-    '贪污', '腐败', '受贿', '洗钱', '走私', '贩毒', '吸毒',
-    '黑客', '攻击', '入侵', '病毒', '木马', '钓鱼', '诈骗',
-    '谣言', '诽谤', '造谣', '煽动', '仇恨', '歧视', '偏见',
-    '色情网站', '成人网站', '黄色网站', '淫秽', '露骨', '挑逗',
-    '赌博网站', '博彩', '彩票', '赌球', '赌马', '六合彩',
-    '毒品交易', '冰毒', '海洛因', '大麻', '摇头丸', '鸦片',
-    '枪支', '弹药', '管制刀具', '武器', '凶器',
-    '色情图片', '色情视频', '成人影片', 'AV', '色情小说',
-    '政治敏感', '敏感事件', '敏感人物', '敏感话题',
-    '辱骂', '脏话', '粗口', '侮辱性', '攻击性', '威胁性',
-    '人肉搜索', '隐私泄露', '个人信息', '身份证', '手机号',
-    '广告', '推广', '营销', '引流', '刷单', '返利',
-    '钓鱼网站', '欺诈', '虚假信息', '骗局', '传销', '非法集资',
-    '反动言论', '颠覆', '煽动颠覆', '危害国家安全',
-    '极端主义', '恐怖主义', '圣战', 'ISIS', '基地组织',
-    '种族歧视', '性别歧视', '地域歧视', '年龄歧视', '残障歧视',
-    '校园霸凌', '校园暴力', '欺凌', '殴打', '辱骂', '排挤',
-    '自杀倾向', '自残', '自虐', '轻生', '绝望', '抑郁',
-    '暴力游戏', '血腥游戏', '恐怖游戏', '杀人游戏',
-    '暴力电影', '血腥电影', '恐怖电影', '色情电影',
+  const singleCharWords = [
+    '操', '草', '日', '妈', '逼', '屌', '鸡', '巴', '屁', '屎',
+    '尿', '粪', '奸', '淫', '毒', '赌', '嫖', '骗', '抢', '杀',
+    '偷', '盗', '炸', '烧', '砍', '打', '骂', '淫', '秽', '裸',
+    '性', '黄', '暴', '恐', '邪', '黑', '假', '骗', '诈', '贪',
+    '腐', '贿', '毒', '枪', '弹', '刀', '凶', '邪', '恶', '坏',
   ]
 
-  const pinyinVariants: Record<string, string[]> = {
-    'baoli': ['暴力'],
-    'seqing': ['色情'],
-    'dubo': ['赌博'],
-    'dupin': ['毒品'],
-    'zisha': ['自杀'],
-    'sharen': ['杀人'],
-    'qiangjie': ['抢劫'],
-    'zhapian': ['诈骗'],
-    'weifa': ['违法'],
-    'weigui': ['违规'],
-    'xiejiao': ['邪教'],
-    'kongbu': ['恐怖'],
-    'fandong': ['反动'],
-  }
+  const twoCharWords = [
+    '暴力', '色情', '赌博', '毒品', '自杀', '杀人', '抢劫', '诈骗',
+    '违法', '违规', '邪教', '恐怖', '反动', '分裂', '台独', '藏独',
+    '卖淫', '嫖娼', '强奸', '乱伦', '兽交', '恋童', '血腥', '自残',
+    '斗殴', '绑架', '勒索', '纵火', '爆炸', '贪污', '腐败', '受贿',
+    '洗钱', '走私', '贩毒', '吸毒', '黑客', '攻击', '入侵', '病毒',
+    '木马', '钓鱼', '造谣', '谣言', '诽谤', '煽动', '仇恨', '歧视',
+    '偏见', '淫秽', '露骨', '挑逗', '博彩', '彩票', '赌球', '赌马',
+    '枪支', '弹药', '管制', '武器', '凶器', '辱骂', '脏话', '粗口',
+    '威胁', '人肉', '隐私', '广告', '推广', '营销', '引流', '刷单',
+    '返利', '欺诈', '虚假', '骗局', '传销', '颠覆', '圣战', '霸凌',
+    '欺凌', '自虐', '轻生', '绝望', '抑郁', '裸聊', '裸奔', '偷拍',
+    '偷窥', '骚扰', '侮辱', '殴打', '恐吓', '敲诈', '勒索', '盗窃',
+  ]
+
+  const multiCharWords = [
+    '法轮功', '六合彩', '冰毒', '海洛因', '摇头丸', '色情网站',
+    '成人网站', '黄色网站', '赌博网站', '毒品交易', '色情图片',
+    '色情视频', '成人影片', '色情小说', '政治敏感', '敏感事件',
+    '敏感人物', '敏感话题', '侮辱性', '攻击性', '威胁性',
+    '人肉搜索', '隐私泄露', '个人信息', '身份证', '手机号',
+    '钓鱼网站', '虚假信息', '非法集资', '反动言论', '煽动颠覆',
+    '危害国家安全', '极端主义', '恐怖主义', 'ISIS', '基地组织',
+    '种族歧视', '性别歧视', '地域歧视', '年龄歧视', '残障歧视',
+    '校园霸凌', '校园暴力', '自杀倾向', '暴力游戏', '血腥游戏',
+    '恐怖游戏', '杀人游戏', '暴力电影', '血腥电影', '恐怖电影',
+  ]
+
+  const pinyinWords = [
+    'baoli', 'seqing', 'dubo', 'dupin', 'zisha', 'sharen', 'qiangjie',
+    'zhapian', 'weifa', 'weigui', 'xiejiao', 'kongbu', 'fandong',
+    'fenlie', 'taiwan', 'cangdu', 'falungong', 'maiyin', 'piaochang',
+    'qiangjian', 'luanlun', 'shoujiao', 'liantong', 'xuexing', 'zican',
+    'douou', 'bangjia', 'lesuo', 'zonghuo', 'baozha', 'tanwu', 'fubai',
+    'shouhui', 'xiqian', 'zousi', 'fan du', 'xidu', 'heike', 'gongji',
+    'ruqin', 'bingdu', 'muma', 'diaoyu', 'zaoyao', 'feibang', 'sandong',
+    'chouhen', 'qishi', 'pianjian', 'yin hui', 'lugut', 'tiaodou',
+    'bocai', 'caipiao', 'duqiu', 'gupiao', 'qiangzhi', 'wuqi', 'xiongqi',
+    'ruma', 'zanghua', 'cukou', 'weixie', 'renrou', 'yinsi', 'guanggao',
+    'tuiguang', 'yingxiao', 'yinliu', 'shuadan', 'fanli', 'qiya', 'xuji',
+    'pianju', 'chuanxiao', 'dianfu', 'shengzhan', 'lingling', 'qingpie',
+    'ziwen', 'qingsheng', 'juewang', 'yiyu', 'luoliao', 'luoben', 'toupai',
+    'toukou', 'saorao', 'wuru', 'ouchong', 'kongxia', 'qiaozha', 'daoqie',
+  ]
+
+  const baseWords = [...singleCharWords, ...twoCharWords, ...multiCharWords, ...pinyinWords]
 
   words.push(...baseWords)
   
-  for (const pinyin of Object.keys(pinyinVariants)) {
-    words.push(pinyin)
+  for (const url of GITEE_SENSITIVE_WORD_URLS) {
+    const giteeWords = await fetchFromGitee(url)
+    if (giteeWords.length > 0) {
+      words.push(...giteeWords)
+      console.log(`从Gitee获取到 ${giteeWords.length} 个敏感词`)
+    }
   }
   
   words.push(...CAMPUS_BULLYING_WORDS)
 
-  return words
+  return [...new Set(words)]
 }
 
 function cleanWords(words: string[]): string[] {
@@ -84,7 +131,7 @@ function cleanWords(words: string[]): string[] {
   
   return words.filter(word => {
     const lowerWord = word.toLowerCase().trim()
-    if (!lowerWord || lowerWord.length < 2) return false
+    if (!lowerWord || lowerWord.length < 1) return false
     if (falsePositiveSet.has(lowerWord)) return false
     if (lowerWord.includes('test') || lowerWord.includes('example')) return false
     return true

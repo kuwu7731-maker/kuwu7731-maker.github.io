@@ -1,4 +1,4 @@
-import { GraduationCap, MessageCircle, Clock, ArrowRight, TrendingUp } from 'lucide-react'
+import { GraduationCap, MessageCircle, Clock, ArrowRight, TrendingUp, Eye, User } from 'lucide-react'
 import Link from 'next/link'
 import GradePageClient from './GradePageClient'
 
@@ -8,22 +8,27 @@ const gradeInfo: Record<number, { name: string; description: string; color: stri
   9: { name: '九年级 · 冲刺', description: '中考资料、志愿填报、学长学姐经验分享', color: 'purple' },
 }
 
-const mockPosts = [
-  { id: 1, title: '七年级数学学习方法分享', author: '小明', time: '1小时前', views: 128, replies: 15, isTop: true },
-  { id: 2, title: '新学期社团招新啦！', author: '学生会', time: '2小时前', views: 256, replies: 32, isTop: false },
-  { id: 3, title: '如何快速适应初中生活', author: '班主任', time: '3小时前', views: 196, replies: 28, isTop: false },
-  { id: 4, title: '英语单词记忆技巧', author: '学霸君', time: '5小时前', views: 89, replies: 12, isTop: false },
-  { id: 5, title: '周末作业讨论群', author: '班长', time: '昨天', views: 145, replies: 45, isTop: false },
-]
-
 type GradePageProps = {
   params: Promise<{ id: string }>
+}
+
+async function getPosts(gradeId: number) {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/posts?gradeId=${gradeId}&limit=20`, {
+      cache: 'no-store',
+    })
+    const data = await res.json()
+    return data.posts || []
+  } catch {
+    return []
+  }
 }
 
 export default async function GradePage({ params }: GradePageProps) {
   const { id } = await params
   const gradeId = parseInt(id)
   const grade = gradeInfo[gradeId] || gradeInfo[7]
+  const posts = await getPosts(gradeId)
 
   return (
     <div className="min-h-screen">
@@ -75,40 +80,65 @@ export default async function GradePage({ params }: GradePageProps) {
               </div>
             </div>
 
-            <div className="space-y-4">
-              {mockPosts.map((post) => (
-                <div
-                  key={post.id}
-                  className={`glass-card glass-card-hover p-4 flex items-center gap-4 ${post.isTop ? 'border-l-4 border-gemini-cyan' : ''}`}
-                >
-                  {post.isTop && (
-                    <div className="w-8 h-8 rounded-glass-sm bg-gemini-cyan/20 flex items-center justify-center flex-shrink-0">
-                      <span className="text-gemini-cyan text-xs font-bold">顶</span>
-                    </div>
-                  )}
-                  
-                  <div className="flex-1">
-                    <h3 className="text-white font-medium hover:text-gemini-cyan cursor-pointer">{post.title}</h3>
-                    <p className="text-white/50 text-sm mt-1">
-                      <span className="mr-4">{post.author}</span>
-                      <span className="mr-4 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {post.time}
-                      </span>
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-6 text-white/40 text-sm">
-                    <span className="flex items-center gap-1">
-                      <MessageCircle className="w-4 h-4" />
-                      {post.replies}
-                    </span>
-                    <span>{post.views} 阅读</span>
-                    <ArrowRight className="w-4 h-4 text-gemini-cyan" />
-                  </div>
+            {posts.length === 0 ? (
+              <div className="glass-card p-12 text-center">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-gemini-cyan/10 to-gemini-purple/10 flex items-center justify-center border border-white/10">
+                  <GraduationCap className="w-10 h-10 text-gemini-cyan/70" />
                 </div>
-              ))}
-            </div>
+                <p className="text-white/50 text-lg mb-6">暂无帖子，快来发布第一篇吧！</p>
+                <Link 
+                  href="/post/create" 
+                  className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-gemini-cyan via-gemini-blue to-gemini-purple rounded-xl text-white font-medium shadow-[0_0_20px_rgba(0,229,255,0.3)] hover:shadow-[0_0_30px_rgba(0,229,255,0.5)] hover:scale-105 transition-all"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  发布帖子
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {posts.map((post: any) => (
+                  <Link
+                    key={post.id}
+                    href={`/post/${post.id}`}
+                    className={`block bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-5 hover:border-white/20 hover:-translate-y-1 transition-all duration-300 ${post.isTop ? 'border-l-4 border-l-gemini-cyan' : ''}`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-gemini-cyan/20 to-gemini-purple/20 flex items-center justify-center">
+                        <span className="text-white/80 text-sm font-semibold">{post.user?.name?.charAt(0) || '?'}</span>
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          {post.isTop && (
+                            <span className="px-2 py-0.5 rounded text-xs font-bold bg-gemini-cyan/20 text-gemini-cyan">置顶</span>
+                          )}
+                          <span className="text-white/50 text-sm">{post.user?.name || '匿名'}</span>
+                          <span className="text-white/30 text-xs">·</span>
+                          <span className="text-white/40 text-xs flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(post.createdAt).toLocaleDateString('zh-CN')}
+                          </span>
+                        </div>
+                        <h3 className="text-white font-medium text-lg mb-2 hover:text-gemini-cyan transition-colors line-clamp-2">{post.title}</h3>
+                        <p className="text-white/40 text-sm line-clamp-2">{post.content?.substring(0, 100)}...</p>
+                      </div>
+                      
+                      <div className="flex flex-col items-end gap-3 text-white/40 text-sm">
+                        <span className="flex items-center gap-1 hover:text-gemini-cyan transition-colors">
+                          <MessageCircle className="w-4 h-4" />
+                          {post.comments?.length || 0}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Eye className="w-4 h-4" />
+                          {post.viewCount || 0}
+                        </span>
+                        <ArrowRight className="w-5 h-5 text-gemini-cyan/60 hover:text-gemini-cyan transition-colors" />
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
 
             <div className="mt-8 text-center">
               <button className="glass-button">查看更多帖子</button>
