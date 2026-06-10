@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Send, AlertCircle, CheckCircle, BookOpen, FileText, Sparkles, X, AlertTriangle, Home } from 'lucide-react'
 import Link from 'next/link'
-import { freeContentFilter } from '@/lib/sensitive-word/free-content-filter'
+import { FilterCore, getDefaultBlockWords, getDefaultWarnWords, FilterResult } from '@/lib/sensitive-word/filter-core'
 
 export default function CreatePostPage() {
   const [formData, setFormData] = useState({
@@ -12,17 +12,50 @@ export default function CreatePostPage() {
     title: '',
     content: '',
   })
-  const [validationResult, setValidationResult] = useState<{ isBlocked: boolean; isWarning: boolean; blockedWords: string[]; warningWords: string[] } | null>(null)
+  const [validationResult, setValidationResult] = useState<FilterResult | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [modalContent, setModalContent] = useState<{ type: 'block' | 'warning'; words: string[] } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [filterCore, setFilterCore] = useState<FilterCore | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const validateText = useCallback((text: string) => {
-    const result = freeContentFilter.filter(text)
+  useEffect(() => {
+    const loadWords = async () => {
+      try {
+        const response = await fetch('/api/sensitive-words/file-list')
+        if (response.ok) {
+          const data = await response.json()
+          const blockWords = data.blockWords || getDefaultBlockWords()
+          const warnWords = data.warnWords || getDefaultWarnWords()
+          setFilterCore(new FilterCore(blockWords, warnWords))
+        } else {
+          setFilterCore(new FilterCore(getDefaultBlockWords(), getDefaultWarnWords()))
+        }
+      } catch {
+        setFilterCore(new FilterCore(getDefaultBlockWords(), getDefaultWarnWords()))
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadWords()
+  }, [])
+
+  const validateText = useCallback((text: string): FilterResult => {
+    if (!filterCore) {
+      return {
+        isBlocked: false,
+        isWarning: false,
+        blockedWords: [],
+        warningWords: [],
+        message: '内容合规',
+      }
+    }
+    const result = filterCore.filter(text)
     setValidationResult(result)
     return result
-  }, [])
+  }, [filterCore])
 
   const handleInputChange = (field: 'title' | 'content', value: string) => {
     const newData = { ...formData, [field]: value }
@@ -72,6 +105,18 @@ export default function CreatePostPage() {
     }
 
     setIsSubmitting(false)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="w-12 h-12 border-2 border-[#00E5FF]/30 border-t-[#00E5FF] rounded-full"
+        />
+      </div>
+    )
   }
 
   return (

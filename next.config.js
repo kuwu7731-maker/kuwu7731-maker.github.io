@@ -3,15 +3,11 @@ const nextConfig = {
   images: {
     domains: [],
   },
+  turbopack: {},
   experimental: {
     optimizePackageImports: ['lucide-react', 'framer-motion'],
   },
-  modularizeImports: {
-    'lucide-react': {
-      transform: 'lucide-react/dist/esm/icons/{{member}}',
-      skipDefaultConversion: true,
-    },
-  },
+
   webpack: (config, { isServer }) => {
     config.resolve.fallback = { fs: false, net: false, tls: false }
     
